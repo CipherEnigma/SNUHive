@@ -5,11 +5,22 @@ import { body, validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import db from './db.js'; 
 import complaintRoutes from './complaints.js'; 
-const jwtSecret = "zxcvasdfgtrewqyhbvcxzfdsahfs";
+import foodrequestRoutes from './foodrequest.js';
 
 const app = express();
+const jwtSecret = "zxcvasdfgtrewqyhbvcxzfdsahfs";
+
 app.use(cors());
 app.use(express.json()); 
+app.use(express.urlencoded({ extended: true }));
+
+app.get('/test', (req, res) => {
+    res.json({ message: 'Server is working' });
+});
+
+app.use('/api',foodrequestRoutes);
+app.use('/', complaintRoutes);
+
 
 await db.execute(`CREATE TABLE IF NOT EXISTS WARDEN (
     Warden_id VARCHAR(10) PRIMARY KEY,
@@ -78,7 +89,8 @@ await db.execute(`CREATE TABLE IF NOT EXISTS food_request (
     hostel_id VARCHAR(10) DEFAULT NULL, 
     type VARCHAR(50) NOT NULL,
     date DATE NOT NULL,
-    status VARCHAR(10) NOT NULL,
+    status VARCHAR(10) NOT NULL default 'Pending',
+    remarks Text,
     FOREIGN KEY (roll_no) REFERENCES STUDENT(roll_no) ON DELETE SET NULL,
     FOREIGN KEY (hostel_id) REFERENCES HOSTEL(hostel_id) ON DELETE SET NULL
 )`);
@@ -130,8 +142,32 @@ app.post('/createStudent', [
         return res.status(400).json({ errors: errors.array() });
     }
 
-    try {
+
+try {
         const { roll_no, s_name, dept, batch, contact_no, snu_email_id, password, room_no, hostel_id, parent_contact } = req.body;
+
+
+//here I am checking if hostel already exists and if it has capacity
+const [hostel]=await db.execute(
+            `select h.*, (select count(*) from student where hostel_id=?) as current_occupancy from hostel h where h.hostel_id=?`,
+            [hostel_id,hostel_id]
+);
+
+        if(hostel.length==0){
+            return res.status(400).json({message:'This hostel does not exist'});
+        }
+if(hostel[0].current_occupancy>=hostel[0].capacity)
+{
+    return res.status(400).json({message:'This hostel is full'});
+
+}
+
+const [existingEmail] = await db.execute('select snu_email_id from student where snu_email_id=?',
+    [snu_email_id]
+);
+if(existingEmail.length>0){
+    return res.status(400).json({message:'This email is already registered'});
+}
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -147,6 +183,62 @@ app.post('/createStudent', [
     }
 });
 
+
+
+//api route to create hostel
+app.post('/createHostel',[
+    body('hostel_id').notEmpty().withMessage('Hostel ID is required'),
+    body('h_name').notEmpty().withMessage('Hostel name is required'),
+    body('capacity').isInt({min:1}).withMessage('Capacity must be a positive number'),
+    body('warden_id').optional()
+],async (req,res)=>{
+    try{
+        const errors=validationResult(req);
+        if(!errors.isEmpty()){
+            return res.status(400).json({errors:errors.array()});
+}
+const {hostel_id,h_name,capacity,warden_id}=req.body;
+const[existingHostel]=await db.execute(
+    'select hostel_id from hostel where hostel_id=?',
+    [hostel_id]
+);
+if(existingHostel.length>0){
+    return res.status(400).json({message:'Hostel already exists'});
+}
+//here I am checking if warden is already present and verifying that it has already a hostel assigned to it
+if(warden_id){
+    const[warden]=await db.execute(
+    'select warden_id from warden where warden_id=?',
+    [warden_id]
+    );
+
+
+    if(warden.length==0){
+        return res.status(400).json({message:'The specified warden does not exist'});
+    }
+}
+
+await db.execute(`insert into hostel(hostel_id,h_name,capacity,warden_id) values(?,?,?,?)`,
+    [hostel_id,h_name,capacity,warden_id|| null]
+ );
+
+
+ res.status(201).json({
+    message:'Hostel created successfully',
+    hostel:{
+        hostel_id,h_name,capacity,warden_id:warden_id||null//coz warden id is foreign key here 
+    }
+ });
+
+}
+catch(error){
+    console.log("Error creating the hostel:",error);
+
+res.status(500).json({message:'Failed to create a hostel',
+    error:error.message
+});
+}
+});
 // API  to Create support Admin
 app.post('/createSupportAdmin', [
     body('D_Name')
@@ -200,7 +292,7 @@ app.post('/loginWarden', async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         } 
         
-    const authToken = jwt.sign({ roll_no: userData.roll_no }, jwtSecret, { expiresIn: '1h' });
+        const authToken = jwt.sign({ warden_id: userData.Warden_id }, jwtSecret, { expiresIn: '1h' });
         res.json({ success: true, authToken });
 
     } catch (error) {
