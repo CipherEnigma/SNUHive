@@ -6,6 +6,18 @@ import jwt from 'jsonwebtoken';
 import db from './db.js'; 
 import complaintRoutes from './complaints.js'; 
 import foodrequestRoutes from './foodrequest.js';
+import verifyToken from './middleware/verifyToken.js';
+import dotenv from 'dotenv';
+
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables
+dotenv.config({ path: join(__dirname, '..', '.env') });
+
 
 const app = express();
 const jwtSecret = "zxcvasdfgtrewqyhbvcxzfdsahfs";
@@ -16,6 +28,16 @@ app.use(express.urlencoded({ extended: true }));
 
 app.get('/test', (req, res) => {
     res.json({ message: 'Server is working' });
+});
+
+// Add after express initialization
+app.use((req, res, next) => {
+    console.log('Incoming request:', {
+        method: req.method,
+        url: req.url,
+        hasAuthHeader: !!req.headers.authorization
+    });
+    next();
 });
 
 app.use('/api',foodrequestRoutes);
@@ -292,8 +314,8 @@ app.post('/loginWarden', async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         } 
         
-        const authToken = jwt.sign({ warden_id: userData.Warden_id }, jwtSecret, { expiresIn: '1h' });
-        res.json({ success: true, authToken });
+        const token = jwt.sign({ warden_id: userData.Warden_id }, jwtSecret, { expiresIn: '1h' });
+        res.json({ success: true, token });
 
     } catch (error) {
         console.error("Login Error:", error);
@@ -384,9 +406,46 @@ app.post('/loginSupportAdmin', async (req, res) => {
   }
 });
 
+// Replace the student profile routes with these versions
+
+// Get student profile
+app.get('/student/profile', verifyToken, async (req, res) => {
+    try {
+      const roll_no = req.roll_no;
+      console.log('Fetching profile for:', roll_no);
+  
+      const [rows] = await db.execute(`
+        SELECT 
+          s.roll_no,
+          s.s_name,
+          s.dept,
+          s.batch,
+          s.contact_no,
+          s.snu_email_id,
+          s.room_no,
+          s.hostel_id,
+          s.parent_contact,
+          h.h_name
+        FROM STUDENT s
+        LEFT JOIN HOSTEL h ON s.hostel_id = h.hostel_id
+        WHERE s.roll_no = ?
+      `, [roll_no]);
+  
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+  
+      console.log('Found student profile');
+      res.json(rows[0]);
+    } catch (err) {
+      console.error('Error fetching student profile:', err);
+      res.status(500).json({ message: 'Failed to fetch profile', error: err.message });
+    }
+  });
+
 app.use(complaintRoutes); 
 
-const PORT = 5000;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });

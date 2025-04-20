@@ -1,0 +1,36 @@
+.home-carousel {
+    width: 100%;
+    height: 80vh; /* This makes it 80% of the viewport height */
+    overflow: hidden; /* Prevents any overflow */
+  }
+  
+  .carousel-item {
+    height: 80vh; /* Match parent height */
+    position: relative;
+  }
+  
+  .carousel-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block; /* Removes any extra space */
+    max-height: 80vh; /* Ensures consistent max height */
+  }
+  
+  .carousel-caption {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 80%;
+    margin: 0 auto;
+    bottom: 20%;
+  }
+
+  @media screen and (max-width: 768px) {
+    .home-carousel,
+    .carousel-item,
+    .carousel-item img {
+      height: 60vh; /* Slightly smaller on mobile */
+    }
+  }

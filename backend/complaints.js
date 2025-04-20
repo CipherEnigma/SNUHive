@@ -65,7 +65,7 @@ router.get('/department-complaints', verifyAdminToken, async (req, res) => {
         SELECT 
           c.*,
           s.s_name,
-          s.contact_no,
+          s.hostel_id,
           s.room_no
         FROM Complaint c
         JOIN STUDENT s ON c.roll_no = s.roll_no
