@@ -39,9 +39,17 @@ Built to streamline everyday hostel operations, SNUHive fosters transparency and
 ---
 
 ##  Demo
+## 📸 Screenshots
 
+![Landing Page](hive_1.jpg)  
+*Landing page of SNUHive*
 
-![Demo GIF](demo.gif)
+![Signup Page](hive_2.jpg)  
+*Signup flow for new users*
+
+![Complaints](hive_4.jpg)
+*complaints*
+
 
 ---
 
